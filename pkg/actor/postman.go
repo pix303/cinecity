@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	ErrActorNotFound                 = errors.New("actor not found")
-	ErrActorAddressAlreadyRegistered = errors.New("actor address already registered")
-	ErrActorAddressCanNotBeNull      = errors.New("actor address ")
+	ErrActorNotFound                   = errors.New("actor not found")
+	ErrActorAddressAlreadyRegistered   = errors.New("actor address already registered")
+	ErrActorAddressCanNotBeNull        = errors.New("actor address ")
+	ErrInboxReturnMessageBodyTypeWrong = errors.New("return body message type is wrong")
 )
 
 type Postman struct {
@@ -89,7 +90,7 @@ func SendMessage(msg Message) error {
 	slog.Debug("actor found, sending msg", slog.String("actor-address", msg.To.String()))
 	err := actor.Inbox(msg)
 	if err != nil {
-		slog.Error("actor inbox error", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
+		slog.Error("actor inbox return error", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
 		return err
 	}
 	return nil
@@ -105,14 +106,20 @@ func SendMessageWithResponse[T any](msg Message) (T, error) {
 
 	returnMsg, err := actor.InboxAndWaitResponse(msg)
 	if err != nil {
-		slog.Error("actor inbox return error", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
+		slog.Error(
+			"actor inbox with response return error",
+			slog.String("actor-address", msg.To.String()),
+			slog.String("error", err.Error()),
+			slog.Any("msg", new(T)),
+		)
+		return *new(T), err
 	}
 
 	if body, ok := returnMsg.Body.(T); ok {
 		return body, nil
 	}
 
-	return *new(T), err
+	return *new(T), ErrInboxReturnMessageBodyTypeWrong
 }
 
 func BroadcastMessage(msg Message) {
