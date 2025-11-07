@@ -11,9 +11,9 @@ import (
 )
 
 var (
+	ErrAddressInvalid                  = errors.New("address is invalid: area or id are empty")
 	ErrActorNotFound                   = errors.New("actor not found")
 	ErrActorAddressAlreadyRegistered   = errors.New("actor address already registered")
-	ErrActorAddressCanNotBeNull        = errors.New("actor address ")
 	ErrInboxReturnMessageBodyTypeWrong = errors.New("return body message type is wrong")
 )
 
@@ -37,7 +37,7 @@ func GetPostman() *Postman {
 				s := <-extCancel
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM:
-					Shutdown()
+					ShutdownAll()
 				}
 			}
 		}()
@@ -55,22 +55,28 @@ func (postman *Postman) GetContext() context.Context {
 	return postman.context
 }
 
-func RegisterActor(actor *Actor) error {
-	if actor == nil {
-		slog.Error("nil actor cant be register")
-		return ErrActorAddressCanNotBeNull
+func RegisterActor(address *Address, processor StateProcessor) (*Actor, error) {
+	if address == nil || address.area == "" || address.id == "" {
+		return nil, ErrAddressInvalid
+	}
+
+	a := Actor{
+		address:    address,
+		state:      processor,
+		MessageBox: make(chan Message, 100),
+		isClosed:   true,
 	}
 
 	p := GetPostman()
-	if temp := p.actors[actor.GetAddress().String()]; temp != nil {
-		slog.Error(ErrActorAddressAlreadyRegistered.Error(), slog.String("actor-address", actor.GetAddress().String()))
-		return ErrActorAddressAlreadyRegistered
+	if temp := p.actors[a.GetAddress().String()]; temp != nil {
+		slog.Error(ErrActorAddressAlreadyRegistered.Error(), slog.String("actor-address", a.GetAddress().String()))
+		return nil, ErrActorAddressAlreadyRegistered
 	}
 
-	p.actors[actor.GetAddress().String()] = actor
-	slog.Info("actor registered", slog.String("a", actor.GetAddress().String()))
-	actor.Activate()
-	return nil
+	p.actors[a.GetAddress().String()] = &a
+	slog.Info("actor registered", slog.String("a", a.GetAddress().String()))
+	a.Activate()
+	return &a, nil
 }
 
 func UnRegisterActor(address *Address) {
@@ -132,11 +138,7 @@ func BroadcastMessage(msg Message) {
 	}
 }
 
-func Subcribe(msg Message) error {
-	return SendMessage(msg)
-}
-
-func Shutdown() {
+func ShutdownAll() {
 	p := GetPostman()
 	for _, a := range p.actors {
 		a.Drop()

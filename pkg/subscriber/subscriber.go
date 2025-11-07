@@ -10,7 +10,7 @@ type SubscriptionsState struct {
 	subscribers []*actor.Address
 }
 
-func NewSubscribeState() *SubscriptionsState {
+func NewSubscriptionsState() *SubscriptionsState {
 	return &SubscriptionsState{
 		subscribers: make([]*actor.Address, 0),
 	}
@@ -26,6 +26,10 @@ func (state *SubscriptionsState) RemoveSubscription(subscriberAddress *actor.Add
 			state.subscribers = append(state.subscribers[:i], state.subscribers[i+1:]...)
 		}
 	}
+}
+
+func (state *SubscriptionsState) NumSubscribers() int {
+	return len(state.subscribers)
 }
 
 func (state *SubscriptionsState) NotifySubscribers(msg actor.Message) {

@@ -33,21 +33,22 @@ func NewBatcher(timeoutMs uint, maxMessages uint, fn MessageProcessHandler) *Bat
 
 func (batcher *Batcher) Add(msg actor.Message) {
 	batcher.mutex.Lock()
-	defer batcher.mutex.Unlock()
-
 	if len(batcher.messages) == 0 {
+		slog.Info("batch timer started", slog.Time("time", time.Now()), slog.Duration("timeout", batcher.timeout))
 		batcher.timer = time.AfterFunc(batcher.timeout, batcher.process)
 	}
-
 	batcher.messages = append(batcher.messages, msg)
-	slog.Info("batch msg added", slog.Int("totalMsg", len(batcher.messages)))
-	if len(batcher.messages) == int(batcher.maxNumMessages) {
+	slog.Info("batch msg added", slog.Int("totalMsg", len(batcher.messages)), slog.Int("max", int(batcher.maxNumMessages)))
+	batcher.mutex.Unlock()
+
+	if len(batcher.messages) >= int(batcher.maxNumMessages) {
+		slog.Info("batch max messages reached")
 		batcher.process()
 	}
 }
 
 func (batcher *Batcher) process() {
-	slog.Info("batch process start")
+	slog.Info("batch process started", slog.Time("time", time.Now()))
 	for _, msg := range batcher.messages {
 		batcher.processMessageFn(msg)
 	}

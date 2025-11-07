@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	ErrAddressNil            = errors.New("actor cant have a nil address")
-	ErrAddressAlreadyUsed    = errors.New("address is already used")
 	ErrInboxClosed           = errors.New("actor has inbox closed")
 	ErrSendWithReturnTimeout = errors.New("message with retrun has not be processed in time")
 )
@@ -20,25 +18,6 @@ type Actor struct {
 	MessageBox chan Message
 	isClosed   bool
 	state      StateProcessor
-}
-
-func NewActor(address *Address, processor StateProcessor) (Actor, error) {
-	if address == nil {
-		return Actor{}, ErrAddressNil
-	}
-
-	p := GetPostman()
-	if temp := p.actors[address.String()]; temp != nil {
-		slog.Error(ErrAddressAlreadyUsed.Error(), slog.String("actor-address", address.String()))
-		return Actor{}, ErrAddressAlreadyUsed
-	}
-
-	return Actor{
-		address:    address,
-		state:      processor,
-		MessageBox: make(chan Message, 100),
-		isClosed:   true,
-	}, nil
 }
 
 func (a *Actor) Activate() {
@@ -90,7 +69,7 @@ func (a *Actor) InboxAndWaitResponse(msg Message) (Message, error) {
 
 	err := a.Inbox(msg)
 	if err != nil {
-		return Message{}, err
+		return EmptyMessage, err
 	}
 
 	select {

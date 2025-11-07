@@ -7,22 +7,30 @@ type Message struct {
 	To            *Address
 	Body          any
 	WithReturn    bool
-	ReturnChan    chan WrappedMessage
+	ReturnChan    chan WrappedMessageWithError
 	ReturnTimeout int
 }
 
 var EmptyMessage = Message{}
 
-func NewMessage(to *Address, from *Address, body any, withReturn bool) Message {
-	var c chan WrappedMessage
-	if withReturn {
-		c = make(chan WrappedMessage, 1)
-	}
+func NewMessage(to *Address, from *Address, body any) Message {
 	return Message{
 		To:            to,
 		From:          from,
 		Body:          body,
-		WithReturn:    withReturn,
+		WithReturn:    false,
+		ReturnChan:    nil,
+		ReturnTimeout: 0,
+	}
+}
+
+func NewMessageWithResponse(to *Address, from *Address, body any) Message {
+	c := make(chan WrappedMessageWithError, 1)
+	return Message{
+		To:            to,
+		From:          from,
+		Body:          body,
+		WithReturn:    true,
 		ReturnChan:    c,
 		ReturnTimeout: 60,
 	}
@@ -32,25 +40,18 @@ func (msg *Message) SetTimeout(value int) {
 	msg.ReturnTimeout = value
 }
 
-func NewReturnMessage(body any, originalMessage Message) Message {
-	return NewMessage(
-		originalMessage.From,
-		originalMessage.To,
-		body,
-		false,
-	)
-}
-
-type WrappedMessage struct {
+type WrappedMessageWithError struct {
 	Message *Message
 	Err     error
 }
 
-func NewWrappedMessage(msg *Message, err error) WrappedMessage {
-	if msg == nil {
-		msg = &EmptyMessage
-	}
-	return WrappedMessage{msg, err}
+func NewReturnMessage(body any, originalMessage Message, err error) WrappedMessageWithError {
+	m := NewMessage(
+		originalMessage.From,
+		originalMessage.To,
+		body,
+	)
+	return WrappedMessageWithError{&m, err}
 }
 
 type AddSubscriptionMessageBody struct{}

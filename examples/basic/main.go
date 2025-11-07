@@ -52,16 +52,16 @@ type RemoveQuantityToProductPayload struct {
 
 // Process processes incoming messages and updates the state accordingly.
 func (state *ProductsState) Process(msg actor.Message) {
-	switch paylaod := msg.Body.(type) {
+	switch payload := msg.Body.(type) {
 
 	case AddNewProductPayload:
 		slog.Info("AddProductMsg")
-		p := paylaod.Product
+		p := payload.Product
 		state.products = append(state.products, p)
 
 	case AddQuantityToProductPayload:
 		slog.Info("AddQuantityProductMsg")
-		p := paylaod.Product
+		p := payload.Product
 		cp := state.getProduct(p.Code)
 		if cp != nil {
 			cp.Quantity += p.Quantity
@@ -72,7 +72,7 @@ func (state *ProductsState) Process(msg actor.Message) {
 
 	case RemoveQuantityToProductPayload:
 		slog.Info("RemoveQuantityProductMsg")
-		p := paylaod.Product
+		p := payload.Product
 		cp := state.getProduct(p.Code)
 		if cp != nil {
 			cp.Quantity -= p.Quantity
@@ -105,7 +105,7 @@ func main() {
 
 	warehouseAddress := actor.NewAddress("local", "warehouse")
 
-	warehouseActor, err := actor.NewActor(
+	warehouseActor, err := actor.RegisterActor(
 		warehouseAddress,
 		NewProductState(),
 	)
@@ -115,29 +115,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = actor.RegisterActor(&warehouseActor)
-	if err != nil {
-		slog.Error("error on register actor", slog.String("err", err.Error()))
-		os.Exit(1)
-	}
-
 	msg := actor.NewMessage(
 		warehouseAddress,
 		nil,
 		AddNewProductPayload{Product{Code: "ABC", Quantity: 5}},
-		false,
 	)
 	msg2 := actor.NewMessage(
 		warehouseAddress,
 		nil,
 		AddQuantityToProductPayload{Product{Code: "ABC", Quantity: 10}},
-		false,
 	)
 	msg3 := actor.NewMessage(
 		warehouseAddress,
 		nil,
 		RemoveQuantityToProductPayload{Product{Code: "ABC", Quantity: 2}},
-		false,
 	)
 
 	actor.SendMessage(msg)
