@@ -1,0 +1,6 @@
+[tasks.test]
+run = [
+	'go test -v ./pkg/...',
+	'go test -coverprofile=coverage.out ./pkg/...',
+	'go tool cover -html=coverage.out -o=coverage.html'
+]
