@@ -18,9 +18,9 @@ func TestNewMessage(t *testing.T) {
 	assert.Equal(t, toAddr, msg.To, "To address should match")
 	assert.Equal(t, fromAddr, msg.From, "From address should match")
 	assert.Equal(t, body, msg.Body, "Body should match")
-	assert.False(t, msg.WithReturn, "WithReturn should be false")
-	assert.Nil(t, msg.ReturnChan, "ReturnChan should be nil")
-	assert.Equal(t, 0, msg.ReturnTimeout, "ReturnTimeout should be 0")
+	assert.False(t, msg.WithResponse, "WithReturn should be false")
+	assert.Nil(t, msg.ResponseChan, "ReturnChan should be nil")
+	assert.Equal(t, 0, msg.ResponseTimeout, "ReturnTimeout should be 0")
 }
 
 func TestNewMessageWithReturn(t *testing.T) {
@@ -33,9 +33,9 @@ func TestNewMessageWithReturn(t *testing.T) {
 	assert.Equal(t, toAddr, msg.To, "To address should match")
 	assert.Equal(t, fromAddr, msg.From, "From address should match")
 	assert.Equal(t, body, msg.Body, "Body should match")
-	assert.True(t, msg.WithReturn, "WithReturn should be true")
-	assert.NotNil(t, msg.ReturnChan, "ReturnChan should not be nil")
-	assert.Equal(t, 60, msg.ReturnTimeout, "ReturnTimeout should be 60")
+	assert.True(t, msg.WithResponse, "WithReturn should be true")
+	assert.NotNil(t, msg.ResponseChan, "ReturnChan should not be nil")
+	assert.Equal(t, 60, msg.ResponseTimeout, "ReturnTimeout should be 60")
 }
 
 func TestNewReturnMessage(t *testing.T) {
@@ -50,8 +50,8 @@ func TestNewReturnMessage(t *testing.T) {
 	assert.Equal(t, fromAddr, returnMsg.Message.To, "Return message To should be original From")
 	assert.Equal(t, toAddr, returnMsg.Message.From, "Return message From should be original To")
 	assert.Equal(t, returnBody, returnMsg.Message.Body, "Return message body should match")
-	assert.False(t, returnMsg.Message.WithReturn, "Return message should not have return")
-	assert.Nil(t, returnMsg.Message.ReturnChan, "Return message ReturnChan should be nil")
+	assert.False(t, returnMsg.Message.WithResponse, "Return message should not have return")
+	assert.Nil(t, returnMsg.Message.ResponseChan, "Return message ReturnChan should be nil")
 	assert.NotNil(t, returnMsg.Err, "Return message should be contain an error")
 	assert.Contains(t, "test error", returnMsg.Err.Error(), "Return error message should be consistent")
 }
@@ -68,8 +68,8 @@ func TestNewReturnMessageWithNullError(t *testing.T) {
 	assert.Equal(t, fromAddr, returnMsg.Message.To, "Return message To should be original From")
 	assert.Equal(t, toAddr, returnMsg.Message.From, "Return message From should be original To")
 	assert.Equal(t, returnBody, returnMsg.Message.Body, "Return message body should match")
-	assert.False(t, returnMsg.Message.WithReturn, "Return message should not have return")
-	assert.Nil(t, returnMsg.Message.ReturnChan, "Return message ReturnChan should be nil")
+	assert.False(t, returnMsg.Message.WithResponse, "Return message should not have return")
+	assert.Nil(t, returnMsg.Message.ResponseChan, "Return message ReturnChan should be nil")
 	assert.Nil(t, returnMsg.Err, "Return message should not contain an error")
 }
 
@@ -79,13 +79,13 @@ func TestMessageSetTimeout(t *testing.T) {
 	body := "test message"
 
 	msg := actor.NewMessage(toAddr, fromAddr, body)
-	assert.Equal(t, 0, msg.ReturnTimeout, "Initial timeout should be 0")
+	assert.Equal(t, 0, msg.ResponseTimeout, "Initial timeout should be 0")
 
 	msg.SetTimeout(30)
-	assert.Equal(t, 30, msg.ReturnTimeout, "Timeout should be updated to 30")
+	assert.Equal(t, 30, msg.ResponseTimeout, "Timeout should be updated to 30")
 
 	msg.SetTimeout(120)
-	assert.Equal(t, 120, msg.ReturnTimeout, "Timeout should be updated to 120")
+	assert.Equal(t, 120, msg.ResponseTimeout, "Timeout should be updated to 120")
 }
 
 func TestNewAddSubscriptionMessage(t *testing.T) {
@@ -170,19 +170,19 @@ func TestMessageReturnChannel(t *testing.T) {
 	msg := actor.NewMessageWithResponse(toAddr, fromAddr, body)
 
 	// Test that ReturnChan is a buffered channel with capacity 1
-	assert.Equal(t, 1, cap(msg.ReturnChan), "ReturnChan should have capacity 1")
+	assert.Equal(t, 1, cap(msg.ResponseChan), "ReturnChan should have capacity 1")
 
 	// Test sending and receiving from ReturnChan
 	wrappedMsg := actor.NewReturnMessage("return content", msg, nil)
 	select {
-	case msg.ReturnChan <- wrappedMsg:
+	case msg.ResponseChan <- wrappedMsg:
 		assert.True(t, true, "Should be able to send to ReturnChan")
 	default:
 		t.Error("Should be able to send to ReturnChan")
 	}
 
 	select {
-	case received := <-msg.ReturnChan:
+	case received := <-msg.ResponseChan:
 		assert.Equal(t, wrappedMsg, received, "Should receive the same wrapped message")
 	default:
 		t.Error("Should be able to receive from ReturnChan")

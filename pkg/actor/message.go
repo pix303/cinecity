@@ -3,41 +3,41 @@ package actor
 import "fmt"
 
 type Message struct {
-	From          *Address
-	To            *Address
-	Body          any
-	WithReturn    bool
-	ReturnChan    chan WrappedMessageWithError
-	ReturnTimeout int
+	From            *Address
+	To              *Address
+	Body            any
+	WithResponse    bool
+	ResponseChan    chan WrappedMessageWithError
+	ResponseTimeout int
 }
 
 var EmptyMessage = Message{}
 
 func NewMessage(to *Address, from *Address, body any) Message {
 	return Message{
-		To:            to,
-		From:          from,
-		Body:          body,
-		WithReturn:    false,
-		ReturnChan:    nil,
-		ReturnTimeout: 0,
+		To:              to,
+		From:            from,
+		Body:            body,
+		WithResponse:    false,
+		ResponseChan:    nil,
+		ResponseTimeout: 0,
 	}
 }
 
 func NewMessageWithResponse(to *Address, from *Address, body any) Message {
 	c := make(chan WrappedMessageWithError, 1)
 	return Message{
-		To:            to,
-		From:          from,
-		Body:          body,
-		WithReturn:    true,
-		ReturnChan:    c,
-		ReturnTimeout: 60,
+		To:              to,
+		From:            from,
+		Body:            body,
+		WithResponse:    true,
+		ResponseChan:    c,
+		ResponseTimeout: 60,
 	}
 }
 
 func (msg *Message) SetTimeout(value int) {
-	msg.ReturnTimeout = value
+	msg.ResponseTimeout = value
 }
 
 type WrappedMessageWithError struct {

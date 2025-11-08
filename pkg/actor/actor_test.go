@@ -46,8 +46,8 @@ func (state *TestProcessorState) Process(msg actor.Message) {
 		r := fmt.Sprintf("processed by third event: %s", msg.Body)
 		state.Data = &r
 		var returnMsg TestReturnMessage = "return msg triggerd by third message"
-		if msg.WithReturn {
-			msg.ReturnChan <- actor.NewReturnMessage(returnMsg, msg, nil)
+		if msg.WithResponse {
+			msg.ResponseChan <- actor.NewReturnMessage(returnMsg, msg, nil)
 		}
 	case TestReturnMessage:
 		r := fmt.Sprintf("processed with return event: %s", msg.Body)

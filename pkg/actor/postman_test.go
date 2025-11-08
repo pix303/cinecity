@@ -32,9 +32,9 @@ func (m *mockProcessor) Process(msg actor.Message) {
 		m.notifier.NotifySubscribers(subsMsg)
 	case WithReturnTriggerMsgBody:
 		rBody := WithReturnTriggerMsgBodyReturn(fmt.Sprintf("returned: %s", payload.Content))
-		if msg.WithReturn {
+		if msg.WithResponse {
 			returnMsg := actor.NewReturnMessage(rBody, msg, nil)
-			msg.ReturnChan <- returnMsg
+			msg.ResponseChan <- returnMsg
 		}
 	case string:
 		m.state = msg.Body.(string)

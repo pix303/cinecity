@@ -62,10 +62,10 @@ func (a *Actor) Inbox(msg Message) error {
 }
 
 func (a *Actor) InboxAndWaitResponse(msg Message) (Message, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(msg.ReturnTimeout)*time.Second)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(msg.ResponseTimeout)*time.Second)
 	defer cancelFunc()
 
-	returnChan := msg.ReturnChan
+	returnChan := msg.ResponseChan
 
 	err := a.Inbox(msg)
 	if err != nil {
