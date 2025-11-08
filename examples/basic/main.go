@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -50,39 +51,61 @@ type RemoveQuantityToProductPayload struct {
 	Product Product
 }
 
+type GetProductPayload struct {
+	ProductID string
+}
+
+type GetProductResponsePayload struct {
+	Product Product
+}
+
 // Process processes incoming messages and updates the state accordingly.
 func (state *ProductsState) Process(msg actor.Message) {
 	switch payload := msg.Body.(type) {
 
 	case AddNewProductPayload:
-		slog.Info("AddProductMsg")
+		slog.Info("handling add product message")
 		p := payload.Product
 		state.products = append(state.products, p)
 
 	case AddQuantityToProductPayload:
-		slog.Info("AddQuantityProductMsg")
+		slog.Info("handling add quantity to product message")
 		p := payload.Product
 		cp := state.getProduct(p.Code)
 		if cp != nil {
 			cp.Quantity += p.Quantity
-			slog.Info("AddQuantityProductMsg update with success", slog.Int("qty", p.Quantity))
+			slog.Info("update quantity with success", slog.Int("qty", p.Quantity))
 		} else {
-			slog.Info("AddQuantityProductMsg update fail")
+			slog.Info("update quantity fail")
 		}
 
 	case RemoveQuantityToProductPayload:
-		slog.Info("RemoveQuantityProductMsg")
+		slog.Info("handling remove quantity to product message")
 		p := payload.Product
 		cp := state.getProduct(p.Code)
 		if cp != nil {
 			cp.Quantity -= p.Quantity
-			slog.Info("RemoveQuantityProductMsg update with success", slog.Int("qty", p.Quantity))
+			slog.Info("update quantity with success", slog.Int("qty", p.Quantity))
 		} else {
-			slog.Info("RemoveQuantityProductMsg update fail")
+			slog.Info("update quantity fail")
+		}
+
+	case GetProductPayload:
+		slog.Info("handling retrive product and respond")
+		pid := payload.ProductID
+		cp := state.getProduct(pid)
+		if msg.WithResponse {
+			if cp != nil {
+				responseMsg := actor.NewReturnMessage(GetProductResponsePayload{Product: *cp}, msg, nil)
+				msg.ResponseChan <- responseMsg
+			} else {
+				responseErrorMsg := actor.NewReturnMessage(nil, msg, errors.New("product not found"))
+				msg.ResponseChan <- responseErrorMsg
+			}
 		}
 
 	default:
-		slog.Warn("this msg is unknown", slog.String("msg", msg.String()))
+		slog.Warn("currently this msg is not handled", slog.String("msg", msg.String()))
 	}
 
 	slog.Info("---------------------------------------------------")
@@ -138,5 +161,19 @@ func main() {
 	<-time.After(1 * time.Second)
 
 	slog.Info("final state", slog.Any("products", warehouseActor.GetState()))
+
+	msg4 := actor.NewMessageWithResponse(
+		warehouseAddress,
+		nil,
+		GetProductPayload{ProductID: "ABC"},
+	)
+
+	response, err := actor.SendMessageWithResponse[GetProductResponsePayload](msg4)
+	if err != nil {
+		slog.Error("error on get product", slog.String("err", err.Error()))
+	} else {
+		slog.Info("retrived product", slog.Any("product", response.Product))
+	}
+
 	slog.Info("---- end of basic example -------")
 }
