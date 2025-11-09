@@ -50,8 +50,6 @@ warehouseActor, err := actor.RegisterActor(
 	// usually create before because of return of errors due to dependences initialization
 	NewProductState(), 
 )
-
-// check for already registerd address
 ```
 
 Messages are shipping in a async mode; here an example to create a message and send it
