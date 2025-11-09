@@ -1,7 +1,7 @@
 # Cinecity
 
 A simple and lightweight implementation of the Actor pattern in Go, designed to better understand the pattern, tested to verify its effectiveness in a personal project [https://github.com/pix303/localemgmt-go](localemgmt-go).
-For examples of actor model implementation in Go you should see [https://github.com/vladopajic/go-actor](go-actor) or [hollywood](https://github.com/anthdm/hollywood)
+For examples of actor model implementation in Go you should see [go-actor](https://github.com/vladopajic/go-actor) or [hollywood](https://github.com/anthdm/hollywood)
 
 ## Overview
 
