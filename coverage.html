@@ -61,7 +61,7 @@
 				
 				<option value="file2">github.com/pix303/cinecity/pkg/actor/message.go (100.0%)</option>
 				
-				<option value="file3">github.com/pix303/cinecity/pkg/actor/postman.go (91.7%)</option>
+				<option value="file3">github.com/pix303/cinecity/pkg/actor/postman.go (91.0%)</option>
 				
 				<option value="file4">github.com/pix303/cinecity/pkg/batch/batch.go (100.0%)</option>
 				
@@ -204,15 +204,19 @@ func NewAddress(area, id string) *Address <span class="cov8" title="1">{
         }
 }</span>
 
-func (this *Address) IsEqual(address *Address) bool <span class="cov8" title="1">{
-        return this.area == address.area &amp;&amp; this.id == address.id
+func (addr *Address) IsEqual(address *Address) bool <span class="cov8" title="1">{
+        return addr.area == address.area &amp;&amp; addr.id == address.id
 }</span>
 
-func (this *Address) String() string <span class="cov8" title="1">{
-        if this == nil </span><span class="cov8" title="1">{
+func (addr *Address) IsSameArea(area *string) bool <span class="cov8" title="1">{
+        return addr.area == *area
+}</span>
+
+func (addr *Address) String() string <span class="cov8" title="1">{
+        if addr == nil </span><span class="cov8" title="1">{
                 return "address nil"
         }</span>
-        <span class="cov8" title="1">return fmt.Sprintf("%s.%s", this.area, this.id)</span>
+        <span class="cov8" title="1">return fmt.Sprintf("%s.%s", addr.area, addr.id)</span>
 }
 </pre>
 		
@@ -434,14 +438,27 @@ func SendMessageWithResponse[T any](msg Message) (T, error) <span class="cov8" t
         <span class="cov0" title="0">return *new(T), ErrInboxReturnMessageBodyTypeWrong</span>
 }
 
-func BroadcastMessage(msg Message) <span class="cov8" title="1">{
+func BroadcastMessage(msg Message, area *string) int <span class="cov8" title="1">{
+        counter := 0
         p := GetPostman()
+
         for _, a := range p.actors </span><span class="cov8" title="1">{
+                if a.GetAddress().IsEqual(msg.From) </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if area != nil &amp;&amp; !a.GetAddress().IsSameArea(area) </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">counter++
                 err := a.Inbox(msg)
                 if err != nil </span><span class="cov0" title="0">{
                         slog.Warn("actor inbox error on broadcasting message", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
                 }</span>
         }
+
+        <span class="cov8" title="1">return counter</span>
 }
 
 func ShutdownAll() <span class="cov8" title="1">{
