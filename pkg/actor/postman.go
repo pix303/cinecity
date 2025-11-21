@@ -128,14 +128,27 @@ func SendMessageWithResponse[T any](msg Message) (T, error) {
 	return *new(T), ErrInboxReturnMessageBodyTypeWrong
 }
 
-func BroadcastMessage(msg Message) {
+func BroadcastMessage(msg Message, area *string) int {
+	counter := 0
 	p := GetPostman()
+
 	for _, a := range p.actors {
+		if a.GetAddress().IsEqual(msg.From) {
+			continue
+		}
+
+		if area != nil && !a.GetAddress().IsSameArea(area) {
+			continue
+		}
+
+		counter++
 		err := a.Inbox(msg)
 		if err != nil {
 			slog.Warn("actor inbox error on broadcasting message", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
 		}
 	}
+
+	return counter
 }
 
 func ShutdownAll() {

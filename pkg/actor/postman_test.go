@@ -181,7 +181,7 @@ func TestSendMessageWithResponseToNonExistentActor(t *testing.T) {
 	assert.Equal(t, actor.ErrActorNotFound, err, "Expected ErrActorNotFound")
 }
 
-func TestBroadcastMessage(t *testing.T) {
+func TestBroadcastMessageToAll(t *testing.T) {
 	actor.ShutdownAll()
 	fromAddr := actor.NewAddress("test", "sender")
 	toAddr1 := actor.NewAddress("test", "receiver1")
@@ -194,12 +194,36 @@ func TestBroadcastMessage(t *testing.T) {
 	actor.RegisterActor(toAddr2, processor2)
 
 	msg := actor.NewMessage(toAddr1, fromAddr, "broadcast message")
-	actor.BroadcastMessage(msg)
+	numSent := actor.BroadcastMessage(msg, nil)
 
 	time.Sleep(100 * time.Millisecond)
 
 	assert.Equal(t, 1, len(processor1.messages), "Expected 1 message for receiver1")
 	assert.Equal(t, 1, len(processor2.messages), "Expected 1 message for receiver2")
+	assert.Equal(t, 2, numSent, "Expected 2 messages to be sent")
+}
+
+func TestBroadcastMessageByArea(t *testing.T) {
+	actor.ShutdownAll()
+	fromAddr := actor.NewAddress("local", "sender")
+	toLocalAddr := actor.NewAddress("local", "receiver")
+	toRemoteAddr := actor.NewAddress("remote", "receiver")
+
+	processorLocal := newMockProcessor()
+	processorRemote := newMockProcessor()
+
+	actor.RegisterActor(toLocalAddr, processorLocal)
+	actor.RegisterActor(toRemoteAddr, processorRemote)
+
+	msg := actor.NewMessage(toLocalAddr, fromAddr, "broadcast message")
+	area := "local"
+	numSent := actor.BroadcastMessage(msg, &area)
+
+	time.Sleep(100 * time.Millisecond)
+
+	assert.Equal(t, 1, len(processorLocal.messages), "Expected 1 message for local receiver")
+	assert.Equal(t, 0, len(processorRemote.messages), "Expected 0 message for remote receiver")
+	assert.Equal(t, 1, numSent, "Expected 1 messages to be sent")
 }
 
 func TestSubscrption(t *testing.T) {
