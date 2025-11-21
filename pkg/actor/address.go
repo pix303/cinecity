@@ -16,13 +16,17 @@ func NewAddress(area, id string) *Address {
 	}
 }
 
-func (this *Address) IsEqual(address *Address) bool {
-	return this.area == address.area && this.id == address.id
+func (addr *Address) IsEqual(address *Address) bool {
+	return addr.area == address.area && addr.id == address.id
 }
 
-func (this *Address) String() string {
-	if this == nil {
+func (addr *Address) IsSameArea(area *string) bool {
+	return addr.area == *area
+}
+
+func (addr *Address) String() string {
+	if addr == nil {
 		return "address nil"
 	}
-	return fmt.Sprintf("%s.%s", this.area, this.id)
+	return fmt.Sprintf("%s.%s", addr.area, addr.id)
 }
