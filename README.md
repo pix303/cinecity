@@ -21,7 +21,7 @@ An Actor is composed of:
 
 ## Examples
 
-The core method to implement for a state processor is Process that takes a message as parameter, evaluate the body type and act consequentially 
+The core method to implement in a state processor is **Process** that takes a message as parameter, evaluate the body type and act consequentially 
 
 ```go
 ...
@@ -40,19 +40,19 @@ func (state *ProductsState) Process(msg actor.Message) {
 ...
 ```
 
-To create and register and actor
+Before to start using an actor it needs to create and register it
 
 ```go
 
 warehouseAddress := actor.NewAddress("local", "warehouse")
 warehouseActor, err := actor.RegisterActor(
   warehouseAddress,
-	// usually create before because of return of errors due to dependences initialization
+	// usually create state processor before to handle errors
 	NewProductState(), 
 )
 ```
 
-Messages are shipping in a async mode; here an example to create a message and send it
+Messages are shipping in a async mode; here an example to create a message and just **send it and forget**
 
 ```go
 msg := actor.NewMessage(
@@ -65,7 +65,7 @@ err := actor.SendMessage(msg)
 	
 ```
 
-Here an example to send a message and wait a response
+Here an example to **send a message and wait a response**
 
 ```go
 msg := actor.NewMessageWithResponse(
@@ -76,4 +76,66 @@ msg := actor.NewMessageWithResponse(
 
 response, err := actor.SendMessageWithResponse[AddQuantityToProductResultPayload](msg)
 	
+```
+
+A message can be broadcast to a group of actors
+
+```go
+msg := actor.NewMessage(
+		warehouseAddress,
+		customerAddress,
+		NewProductAdded{Code: "ABC"},
+	)
+
+// address area filter is optional
+filterByArea := "products"
+numActorsReached := actor.BroadcastMessage(msg, &filterByArea)
+	
+```
+
+An actor can subscribe to messages sent by another actor. The notifying actor will determine how to implement the Process function to decide which messages will be sent
+
+```go
+type NotifierActorProcessor struct {
+	state    StateType
+	notifier *subscriber.SubscriptionsState
+}
+
+
+func (a *NotifierActorProcessor ) Process(msg actor.Message) {
+	switch payload := msg.Body.(type) {
+	// library message body to add a subscription
+	case actor.AddSubscriptionMessageBody:
+		a.notifier.AddSubscription(msg.From)
+	// library message body to remove a subscription
+	case actor.RemoveSubscriptionMessageBody :
+		a.notifier.RemoveSubscription(msg.From)
+	// example of a message that trigger notify the subscribers	
+	case TriggerSubscriptionNotifierBodyMsg:
+		subsMsg := actor.NewSubscribersMessage(msg.To, "hello subscribers!")
+		m.notifier.NotifySubscribers(subsMsg)
+	
+```
+
+Messages can be batched together to avoid unnecessary processing of single messages
+
+```go
+type State struct {
+	state     StateType
+	batcher   *batch.Batcher
+}
+
+func NewState() *State{
+	...
+	b := batch.NewBatcher(5000, 5, state.updateItem)
+	s.batcher = b
+	...
+}
+
+func (state *State) Process(msg actor.Message) {
+	switch msg.Body.(type) {
+	case ItemUpdateMsgPayload:
+		state.batcher.Add(msg)
+	}
+}
 ```
