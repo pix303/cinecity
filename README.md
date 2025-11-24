@@ -19,7 +19,7 @@ An Actor is composed of:
 
 **Postman** is responsible to inbox messages (send message and forget approach) and also to inbox and wait a response (ask approach). It also can send message outside an actor.
 
-## Examples
+## Process message to update state
 
 The core method to implement in a state processor is **Process** that takes a message as parameter, evaluate the body type and act consequentially 
 
@@ -40,6 +40,7 @@ func (state *ProductsState) Process(msg actor.Message) {
 ...
 ```
 
+## Init an actor
 Before to start using an actor it needs to create and register it
 
 ```go
@@ -52,6 +53,7 @@ warehouseActor, err := actor.RegisterActor(
 )
 ```
 
+## Send messages
 Messages are shipping in a async mode; here an example to create a message and just **send it and forget**
 
 ```go
@@ -93,6 +95,7 @@ numActorsReached := actor.BroadcastMessage(msg, &filterByArea)
 	
 ```
 
+## Subscribe to recive messages
 An actor can subscribe to messages sent by another actor. The notifying actor will determine how to implement the Process function to decide which messages will be sent
 
 ```go
@@ -117,6 +120,7 @@ func (a *NotifierActorProcessor ) Process(msg actor.Message) {
 	
 ```
 
+## Debounce and process messages in batch
 Messages can be batched together to avoid unnecessary processing of single messages
 
 ```go
@@ -127,6 +131,7 @@ type State struct {
 
 func NewState() *State{
 	...
+	// wait max 5 seconds or max 5 messages, than trigger the handler function
 	b := batch.NewBatcher(5000, 5, state.updateItem)
 	s.batcher = b
 	...
@@ -134,8 +139,14 @@ func NewState() *State{
 
 func (state *State) Process(msg actor.Message) {
 	switch msg.Body.(type) {
+	// enqueue messages
 	case ItemUpdateMsgPayload:
 		state.batcher.Add(msg)
 	}
+}
+
+// take only one message to process 
+func (s State) updateItem(msg actor.Message){
+	// update state
 }
 ```
