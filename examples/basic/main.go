@@ -44,7 +44,8 @@ type AddNewProductPayload struct {
 }
 
 type AddQuantityToProductPayload struct {
-	Product Product
+	Code     string
+	Quantity int
 }
 
 type RemoveQuantityToProductPayload struct {
@@ -70,10 +71,9 @@ func (state *ProductsState) Process(msg actor.Message) {
 
 	case AddQuantityToProductPayload:
 		slog.Info("handling add quantity to product message")
-		p := payload.Product
-		cp := state.getProduct(p.Code)
-		if cp != nil {
-			cp.Quantity += p.Quantity
+		p := state.getProduct(payload.Code)
+		if p != nil {
+			p.Quantity += payload.Quantity
 			slog.Info("update quantity with success", slog.Int("qty", p.Quantity))
 		} else {
 			slog.Info("update quantity fail")
@@ -146,7 +146,7 @@ func main() {
 	msg2 := actor.NewMessage(
 		warehouseAddress,
 		nil,
-		AddQuantityToProductPayload{Product{Code: "ABC", Quantity: 10}},
+		AddQuantityToProductPayload{Code: "ABC", Quantity: 10},
 	)
 	msg3 := actor.NewMessage(
 		warehouseAddress,
