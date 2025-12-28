@@ -40,18 +40,18 @@ func TestNumSubscriber(t *testing.T) {
 
 func TestNotifySubscribers(t *testing.T) {
 	state := subscriber.NewSubscriptionsState()
-	
+
 	subAddr1 := actor.NewAddress("local", "subscriber1")
 	subAddr2 := actor.NewAddress("local", "subscriber2")
-	
+
 	state.AddSubscription(subAddr1)
 	state.AddSubscription(subAddr2)
-	
+
 	fromAddr := actor.NewAddress("local", "sender")
 	msg := actor.NewMessage(nil, fromAddr, "test message")
-	
+
 	state.NotifySubscribers(msg)
-	
+
 	assert.Equal(t, 2, state.NumSubscribers(), "should have 2 subscribers")
 }
 
@@ -72,31 +72,31 @@ func (m *MockProcessor) GetState() any {
 func TestNotifySubscribersWithDelivery(t *testing.T) {
 	mockProcessor1 := &MockProcessor{}
 	mockProcessor2 := &MockProcessor{}
-	
+
 	subAddr1 := actor.NewAddress("local", "subscriber1")
 	subAddr2 := actor.NewAddress("local", "subscriber2")
-	
+
 	_, err := actor.RegisterActor(subAddr1, mockProcessor1)
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(subAddr1)
-	
+
 	_, err = actor.RegisterActor(subAddr2, mockProcessor2)
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(subAddr2)
-	
+
 	state := subscriber.NewSubscriptionsState()
 	state.AddSubscription(subAddr1)
 	state.AddSubscription(subAddr2)
-	
+
 	fromAddr := actor.NewAddress("local", "sender")
 	msg := actor.NewMessage(nil, fromAddr, "test message")
-	
+
 	state.NotifySubscribers(msg)
-	
+
 	assert.Eventually(t, func() bool {
 		return len(mockProcessor1.receivedMessages) == 1 && len(mockProcessor2.receivedMessages) == 1
 	}, 100*time.Millisecond, 10*time.Millisecond, "both subscribers should receive the message")
-	
+
 	assert.Equal(t, subAddr1, mockProcessor1.receivedMessages[0].To, "message should be addressed to subscriber1")
 	assert.Equal(t, subAddr2, mockProcessor2.receivedMessages[0].To, "message should be addressed to subscriber2")
 	assert.Equal(t, "test message", mockProcessor1.receivedMessages[0].Body, "message body should match")

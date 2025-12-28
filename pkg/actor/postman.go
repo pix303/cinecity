@@ -2,12 +2,16 @@ package actor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/nats-io/nats.go"
 )
 
 var (
@@ -18,15 +22,58 @@ var (
 )
 
 type Postman struct {
-	actors     map[string]*Actor
-	context    context.Context
-	cancelFunc func()
+	actors                 map[string]*Actor
+	context                context.Context
+	cancelFunc             func()
+	enableOutboundMessages bool
+	outboundConnection     *nats.Conn
+}
+type PostmanOption func(*Postman)
+
+func WithOutboundMessage(natsConnection *nats.Conn) PostmanOption {
+	return func(p *Postman) {
+		p.outboundConnection = natsConnection
+		p.enableOutboundMessages = true
+	}
 }
 
-var instance Postman
+func OutboundMessageHandler(msg *nats.Msg) {
+	slog.Info("outbound message received", slog.String("msg", string(msg.Data)))
+	rawAddressSource := strings.Split(msg.Subject, "/")
+	if len(rawAddressSource) != 3 {
+		slog.Error("outbound message subject is invalid", slog.String("msg", string(msg.Subject)))
+		return
+	}
+	address := NewAddress(
+		rawAddressSource[1],
+		rawAddressSource[2],
+	)
+
+	var body any
+
+	err := json.Unmarshal(msg.Data, body)
+	if err != nil {
+		slog.Error("outbound message body is invalid", slog.String("err", err.Error()))
+		return
+	}
+
+	finalMsg := NewMessage(
+		address,
+		nil,
+		body,
+	)
+
+	err = SendMessage(finalMsg)
+	if err != nil {
+		slog.Error("outbound message fail to be send", slog.String("err", err.Error()))
+	}
+}
+
+var instance *Postman
 var onceGuard sync.Once
 
-func GetPostman() *Postman {
+// InitPostman initialize postman service (singleton)
+func InitPostman(opts ...PostmanOption) *Postman {
 	onceGuard.Do(func() {
 		ctx, cancFunc := context.WithCancel(context.Background())
 		extCancel := make(chan os.Signal, 1)
@@ -42,13 +89,43 @@ func GetPostman() *Postman {
 			}
 		}()
 
-		instance = Postman{
+		instance = &Postman{
 			actors:     make(map[string]*Actor, 10),
 			context:    ctx,
 			cancelFunc: cancFunc,
 		}
+
+		natsToken := os.Getenv("NATS_SECRET")
+		if natsToken == "" {
+			slog.Warn("NATS_SECRET is not set, so outbound feature is not active")
+			return
+		} else {
+			nc, err := nats.Connect(nats.DefaultURL, nats.Token(natsToken))
+			if err != nil {
+				slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
+			}
+
+			// TODO: check how to use subscription
+			_, err = nc.Subscribe(OutboundPrefix, OutboundMessageHandler)
+			if err != nil {
+				slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
+			}
+			slog.Info("NATS service is active")
+		}
+
+		for _, opt := range opts {
+			opt(instance)
+		}
 	})
-	return &instance
+
+	return instance
+}
+
+func GetPostman() *Postman {
+	if instance == nil {
+		panic("postman must be initialized before")
+	}
+	return instance
 }
 
 func (postman *Postman) GetContext() context.Context {
@@ -86,6 +163,22 @@ func UnRegisterActor(address *Address) {
 
 func SendMessage(msg Message) error {
 	p := GetPostman()
+
+	if msg.To.isOutbound {
+		var jsonResource []byte
+		err := json.Unmarshal(jsonResource, msg.Body)
+		if err != nil {
+			slog.Error("outbound message body must be json", slog.String("msg", msg.String()))
+			return err
+		}
+		err = p.outboundConnection.Publish(OutboundPrefix, jsonResource)
+		if err != nil {
+			slog.Error("outbound error on publish", slog.String("err", err.Error()))
+			return err
+		}
+		return err
+	}
+
 	actor := p.actors[msg.To.String()]
 
 	if actor == nil {
@@ -99,6 +192,7 @@ func SendMessage(msg Message) error {
 		slog.Error("actor inbox return error", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
 		return err
 	}
+
 	return nil
 }
 
@@ -157,6 +251,7 @@ func ShutdownAll() {
 		a.Drop()
 	}
 	p.actors = make(map[string]*Actor)
+	p.outboundConnection.Close()
 	p.cancelFunc()
 }
 
