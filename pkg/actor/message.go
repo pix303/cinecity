@@ -54,33 +54,6 @@ func NewReturnMessage(body any, originalMessage Message, err error) WrappedMessa
 	return WrappedMessageWithError{&m, err}
 }
 
-type AddSubscriptionMessageBody struct{}
-
-func NewAddSubcriptionMessage(subscriberAddress *Address, notifierAddress *Address) Message {
-	return Message{
-		From: subscriberAddress,
-		To:   notifierAddress,
-		Body: AddSubscriptionMessageBody{},
-	}
-}
-
-type RemoveSubscriptionMessageBody struct{}
-
-func NewRemoveSubscriptionMessage(subscriberAddress *Address, notifierAddress *Address) Message {
-	return Message{
-		From: subscriberAddress,
-		To:   notifierAddress,
-		Body: RemoveSubscriptionMessageBody{},
-	}
-}
-
-func NewSubscribersMessage(from *Address, body any) Message {
-	return Message{
-		From: from,
-		Body: body,
-	}
-}
-
 func (this *Message) String() string {
 	return fmt.Sprintf("from: %s to: %s with body: %v", this.From.String(), this.To.String(), this.Body)
 }
