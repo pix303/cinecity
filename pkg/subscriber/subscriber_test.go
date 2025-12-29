@@ -12,47 +12,46 @@ import (
 
 func TestNewSubscriptionState(t *testing.T) {
 	slog.Info("start testing")
-	state := subscriber.NewSubscriptionsState()
-	assert.Equal(t, 0, state.NumSubscribers(), "initial num of subscribers must be null")
+	subsActor := subscriber.NewSubscriptionsActor()
+	assert.Equal(t, 0, subsActor.NumSubscribers(), "initial num of subscribers must be 0")
 }
 
 func TestAddSubscriber(t *testing.T) {
-	state := subscriber.NewSubscriptionsState()
+	subsActor := subscriber.NewSubscriptionsActor()
 	subAddr := actor.NewAddress("local", "subscriber")
-	state.AddSubscription(subAddr)
-	assert.Equal(t, 1, state.NumSubscribers(), "num of subscribers after add must be 1")
+	addMsg := subscriber.NewAddSubcriptionMessage(subAddr, nil)
+	subsActor.Process(addMsg)
+	assert.Equal(t, 1, subsActor.NumSubscribers(), "num of subscribers after add must be 1")
 }
 
 func TestRemoveSubscriber(t *testing.T) {
-	state := subscriber.NewSubscriptionsState()
+	subsActor := subscriber.NewSubscriptionsActor()
 	subAddr := actor.NewAddress("local", "subscriber")
-	state.AddSubscription(subAddr)
-	state.RemoveSubscription(subAddr)
-	assert.Equal(t, 0, state.NumSubscribers(), "num of subscribers after add and remove must be 0")
-}
-
-func TestNumSubscriber(t *testing.T) {
-	state := subscriber.NewSubscriptionsState()
-	subAddr := actor.NewAddress("local", "subscriber")
-	state.AddSubscription(subAddr)
-	assert.Equal(t, 1, state.NumSubscribers(), "num of subscribers after add and remove must be 0")
+	addMsg := subscriber.NewAddSubcriptionMessage(subAddr, nil)
+	subsActor.Process(addMsg)
+	removeMsg := subscriber.NewRemoveSubscriptionMessage(subAddr, nil)
+	subsActor.Process(removeMsg)
+	assert.Equal(t, 0, subsActor.NumSubscribers(), "num of subscribers after add and remove must be 0")
 }
 
 func TestNotifySubscribers(t *testing.T) {
-	state := subscriber.NewSubscriptionsState()
+	actor.InitPostman()
+	subsActor := subscriber.NewSubscriptionsActor()
 
 	subAddr1 := actor.NewAddress("local", "subscriber1")
 	subAddr2 := actor.NewAddress("local", "subscriber2")
 
-	state.AddSubscription(subAddr1)
-	state.AddSubscription(subAddr2)
+	addMsg1 := subscriber.NewAddSubcriptionMessage(subAddr1, nil)
+	addMsg2 := subscriber.NewAddSubcriptionMessage(subAddr2, nil)
+	subsActor.Process(addMsg1)
+	subsActor.Process(addMsg2)
 
 	fromAddr := actor.NewAddress("local", "sender")
 	msg := actor.NewMessage(nil, fromAddr, "test message")
 
-	state.NotifySubscribers(msg)
+	result := subsActor.NotifySubscribers(msg)
 
-	assert.Equal(t, 2, state.NumSubscribers(), "should have 2 subscribers")
+	assert.Equal(t, 2, result, "should have 2 subscribers")
 }
 
 type MockProcessor struct {
@@ -72,10 +71,10 @@ func (m *MockProcessor) GetState() any {
 func TestNotifySubscribersWithDelivery(t *testing.T) {
 	mockProcessor1 := &MockProcessor{}
 	mockProcessor2 := &MockProcessor{}
-
 	subAddr1 := actor.NewAddress("local", "subscriber1")
 	subAddr2 := actor.NewAddress("local", "subscriber2")
 
+	actor.InitPostman()
 	_, err := actor.RegisterActor(subAddr1, mockProcessor1)
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(subAddr1)
@@ -84,14 +83,16 @@ func TestNotifySubscribersWithDelivery(t *testing.T) {
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(subAddr2)
 
-	state := subscriber.NewSubscriptionsState()
-	state.AddSubscription(subAddr1)
-	state.AddSubscription(subAddr2)
+	subsActor := subscriber.NewSubscriptionsActor()
+	addMsg1 := subscriber.NewAddSubcriptionMessage(subAddr1, nil)
+	addMsg2 := subscriber.NewAddSubcriptionMessage(subAddr2, nil)
+	subsActor.Process(addMsg1)
+	subsActor.Process(addMsg2)
 
 	fromAddr := actor.NewAddress("local", "sender")
 	msg := actor.NewMessage(nil, fromAddr, "test message")
 
-	state.NotifySubscribers(msg)
+	subsActor.NotifySubscribers(msg)
 
 	assert.Eventually(t, func() bool {
 		return len(mockProcessor1.receivedMessages) == 1 && len(mockProcessor2.receivedMessages) == 1

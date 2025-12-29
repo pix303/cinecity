@@ -88,46 +88,13 @@ func TestMessageSetTimeout(t *testing.T) {
 	assert.Equal(t, 120, msg.ResponseTimeout, "Timeout should be updated to 120")
 }
 
-func TestNewAddSubscriptionMessage(t *testing.T) {
-	subscriberAddr := actor.NewAddress("test", "subscriber")
-	notifierAddr := actor.NewAddress("test", "notifier")
-
-	msg := actor.NewAddSubcriptionMessage(subscriberAddr, notifierAddr)
-
-	assert.Equal(t, subscriberAddr, msg.From, "From should be subscriber address")
-	assert.Equal(t, notifierAddr, msg.To, "To should be notifier address")
-	assert.IsType(t, actor.AddSubscriptionMessageBody{}, msg.Body, "Body should be AddSubscriptionMessageBody")
-}
-
-func TestNewRemoveSubscriptionMessage(t *testing.T) {
-	subscriberAddr := actor.NewAddress("test", "subscriber")
-	notifierAddr := actor.NewAddress("test", "notifier")
-
-	msg := actor.NewRemoveSubscriptionMessage(subscriberAddr, notifierAddr)
-
-	assert.Equal(t, subscriberAddr, msg.From, "From should be subscriber address")
-	assert.Equal(t, notifierAddr, msg.To, "To should be notifier address")
-	assert.IsType(t, actor.RemoveSubscriptionMessageBody{}, msg.Body, "Body should be RemoveSubscriptionMessageBody")
-}
-
-func TestNewSubscribersMessage(t *testing.T) {
-	fromAddr := actor.NewAddress("test", "sender")
-	body := []string{"subscriber1", "subscriber2"}
-
-	msg := actor.NewSubscribersMessage(fromAddr, body)
-
-	assert.Equal(t, fromAddr, msg.From, "From should match")
-	assert.Equal(t, body, msg.Body, "Body should match")
-	assert.Nil(t, msg.To, "To should be nil for subscribers message")
-}
-
 func TestMessageString(t *testing.T) {
 	fromAddr := actor.NewAddress("test", "sender")
 	toAddr := actor.NewAddress("test", "receiver")
 	body := "test message"
 
 	msg := actor.NewMessage(toAddr, fromAddr, body)
-	expected := "from: test.sender to: test.receiver with body: test message"
+	expected := "from: test/sender to: test/receiver with body: test message"
 
 	assert.Equal(t, expected, msg.String(), "String representation should match expected format")
 }
@@ -148,13 +115,13 @@ func TestMessageStringWithNilAddresses(t *testing.T) {
 func TestMessageStringWithComplexBody(t *testing.T) {
 	fromAddr := actor.NewAddress("test", "sender")
 	toAddr := actor.NewAddress("test", "receiver")
-	body := map[string]interface{}{"key": "value", "number": 42}
+	body := map[string]any{"key": "value", "number": 42}
 
 	msg := actor.NewMessage(toAddr, fromAddr, body)
 	str := msg.String()
 
-	assert.Contains(t, str, "from: test.sender", "String should contain from address")
-	assert.Contains(t, str, "to: test.receiver", "String should contain to address")
+	assert.Contains(t, str, "from: test/sender", "String should contain from address")
+	assert.Contains(t, str, "to: test/receiver", "String should contain to address")
 	assert.Contains(t, str, "with body:", "String should contain body prefix")
 }
 

@@ -13,7 +13,7 @@ import (
 type mockProcessor struct {
 	state    string
 	messages []actor.Message
-	notifier *subscriber.SubscriptionsState
+	notifier *subscriber.SubscriptionsActor
 }
 
 type TriggerSubscriptionNotifierBodyMsg string
@@ -23,12 +23,11 @@ type WithReturnTriggerMsgBody struct {
 type WithReturnTriggerMsgBodyReturn string
 
 func (m *mockProcessor) Process(msg actor.Message) {
+	m.notifier.Process(msg)
 	m.messages = append(m.messages, msg)
 	switch payload := msg.Body.(type) {
-	case actor.AddSubscriptionMessageBody:
-		m.notifier.AddSubscription(msg.From)
 	case TriggerSubscriptionNotifierBodyMsg:
-		subsMsg := actor.NewSubscribersMessage(msg.To, "hello subscribers!")
+		subsMsg := subscriber.NewSubscribersMessage(msg.To, "hello subscribers!")
 		m.notifier.NotifySubscribers(subsMsg)
 	case WithReturnTriggerMsgBody:
 		rBody := WithReturnTriggerMsgBodyReturn(fmt.Sprintf("returned: %s", payload.Content))
@@ -54,7 +53,7 @@ func newMockProcessor() *mockProcessor {
 	processor := &mockProcessor{
 		state:    "initial",
 		messages: make([]actor.Message, 0),
-		notifier: subscriber.NewSubscriptionsState(),
+		notifier: subscriber.NewSubscriptionsActor(),
 	}
 	return processor
 }
@@ -236,7 +235,7 @@ func TestSubscrption(t *testing.T) {
 	actor.RegisterActor(toAddr, processor)
 	actor.RegisterActor(fromAddr, processorSub)
 
-	subMsg := actor.NewAddSubcriptionMessage(fromAddr, toAddr)
+	subMsg := subscriber.NewAddSubcriptionMessage(fromAddr, toAddr)
 	actor.SendMessage(subMsg)
 	var triggerMsgBody TriggerSubscriptionNotifierBodyMsg = "spread your state"
 	triggerMsg := actor.NewMessage(toAddr, fromAddr, triggerMsgBody)

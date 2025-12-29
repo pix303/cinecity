@@ -13,6 +13,6 @@ func TestPID(t *testing.T) {
 	a2 := actor.NewAddress("local", "a2")
 	assert.True(t, a1.IsEqual(a1bis))
 	assert.False(t, a2.IsEqual(a1))
-	assert.Contains(t, a1.String(), "local.a1")
-	assert.Contains(t, a2.String(), "local.a2")
+	assert.Contains(t, a1.String(), "local/a1")
+	assert.Contains(t, a2.String(), "local/a2")
 }
