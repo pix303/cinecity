@@ -1,6 +1,8 @@
 package actor
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Message struct {
 	From            *Address
@@ -16,6 +18,17 @@ var EmptyMessage = Message{}
 func NewMessage(to *Address, from *Address, body any) Message {
 	return Message{
 		To:              to,
+		From:            from,
+		Body:            body,
+		WithResponse:    false,
+		ResponseChan:    nil,
+		ResponseTimeout: 0,
+	}
+}
+
+func NewBroadcastMessage(from *Address, body any) Message {
+	return Message{
+		To:              nil,
 		From:            from,
 		Body:            body,
 		WithResponse:    false,
@@ -54,6 +67,6 @@ func NewReturnMessage(body any, originalMessage Message, err error) WrappedMessa
 	return WrappedMessageWithError{&m, err}
 }
 
-func (this *Message) String() string {
-	return fmt.Sprintf("from: %s to: %s with body: %v", this.From.String(), this.To.String(), this.Body)
+func (msg *Message) String() string {
+	return fmt.Sprintf("from: %s to: %s with body: %v", msg.From.String(), msg.To.String(), msg.Body)
 }

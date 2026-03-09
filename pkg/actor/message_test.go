@@ -94,7 +94,7 @@ func TestMessageString(t *testing.T) {
 	body := "test message"
 
 	msg := actor.NewMessage(toAddr, fromAddr, body)
-	expected := "from: test/sender to: test/receiver with body: test message"
+	expected := "from: test.sender to: test.receiver with body: test message"
 
 	assert.Equal(t, expected, msg.String(), "String representation should match expected format")
 }
@@ -120,8 +120,8 @@ func TestMessageStringWithComplexBody(t *testing.T) {
 	msg := actor.NewMessage(toAddr, fromAddr, body)
 	str := msg.String()
 
-	assert.Contains(t, str, "from: test/sender", "String should contain from address")
-	assert.Contains(t, str, "to: test/receiver", "String should contain to address")
+	assert.Contains(t, str, "from: test.sender", "String should contain from address")
+	assert.Contains(t, str, "to: test.receiver", "String should contain to address")
 	assert.Contains(t, str, "with body:", "String should contain body prefix")
 }
 

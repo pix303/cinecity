@@ -12,12 +12,24 @@ import (
 
 func TestNewSubscriptionState(t *testing.T) {
 	slog.Info("start testing")
-	subsActor := subscriber.NewSubscriptionsActor()
+	subsActor := subscriber.NewSubscription()
 	assert.Equal(t, 0, subsActor.NumSubscribers(), "initial num of subscribers must be 0")
 }
 
+func TestNewSubscribersMessage(t *testing.T) {
+	fromAddr := actor.NewAddress("local", "sender")
+	body := "test body"
+
+	msg := subscriber.NewSubscribersMessage(fromAddr, body)
+
+	assert.Equal(t, fromAddr, msg.From, "From should match")
+	assert.Equal(t, body, msg.Body, "Body should match")
+	assert.Nil(t, msg.To, "To should be nil")
+	assert.False(t, msg.WithResponse, "WithResponse should be false")
+}
+
 func TestAddSubscriber(t *testing.T) {
-	subsActor := subscriber.NewSubscriptionsActor()
+	subsActor := subscriber.NewSubscription()
 	subAddr := actor.NewAddress("local", "subscriber")
 	addMsg := subscriber.NewAddSubcriptionMessage(subAddr, nil)
 	subsActor.Process(addMsg)
@@ -25,7 +37,7 @@ func TestAddSubscriber(t *testing.T) {
 }
 
 func TestRemoveSubscriber(t *testing.T) {
-	subsActor := subscriber.NewSubscriptionsActor()
+	subsActor := subscriber.NewSubscription()
 	subAddr := actor.NewAddress("local", "subscriber")
 	addMsg := subscriber.NewAddSubcriptionMessage(subAddr, nil)
 	subsActor.Process(addMsg)
@@ -36,7 +48,7 @@ func TestRemoveSubscriber(t *testing.T) {
 
 func TestNotifySubscribers(t *testing.T) {
 	actor.InitPostman()
-	subsActor := subscriber.NewSubscriptionsActor()
+	subsActor := subscriber.NewSubscription()
 
 	subAddr1 := actor.NewAddress("local", "subscriber1")
 	subAddr2 := actor.NewAddress("local", "subscriber2")
@@ -83,7 +95,7 @@ func TestNotifySubscribersWithDelivery(t *testing.T) {
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(subAddr2)
 
-	subsActor := subscriber.NewSubscriptionsActor()
+	subsActor := subscriber.NewSubscription()
 	addMsg1 := subscriber.NewAddSubcriptionMessage(subAddr1, nil)
 	addMsg2 := subscriber.NewAddSubcriptionMessage(subAddr2, nil)
 	subsActor.Process(addMsg1)

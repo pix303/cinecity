@@ -124,7 +124,8 @@ func (state *ProductsState) Shutdown() {
 }
 
 func main() {
-	slog.Info("---- start of basic example -----")
+	slog.Info("---- start basic example -----")
+	actor.InitPostman()
 
 	warehouseAddress := actor.NewAddress("local", "warehouse")
 

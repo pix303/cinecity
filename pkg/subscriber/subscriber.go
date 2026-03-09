@@ -6,12 +6,12 @@ import (
 	"github.com/pix303/cinecity/pkg/actor"
 )
 
-type SubscriptionsActor struct {
+type Subscriptions struct {
 	subscribers []*actor.Address
 }
 
-func NewSubscriptionsActor() *SubscriptionsActor {
-	return &SubscriptionsActor{
+func NewSubscription() *Subscriptions {
+	return &Subscriptions{
 		subscribers: make([]*actor.Address, 0),
 	}
 }
@@ -36,7 +36,7 @@ func NewRemoveSubscriptionMessage(subscriberAddress *actor.Address, notifierAddr
 	}
 }
 
-func (actor *SubscriptionsActor) Process(msg actor.Message) {
+func (actor *Subscriptions) Process(msg actor.Message) {
 	switch msg.Body.(type) {
 	case AddSubscriptionMessageBody:
 		actor.addSubscription(msg.From)
@@ -52,11 +52,11 @@ func NewSubscribersMessage(from *actor.Address, body any) actor.Message {
 	}
 }
 
-func (state *SubscriptionsActor) addSubscription(subscriberAddress *actor.Address) {
+func (state *Subscriptions) addSubscription(subscriberAddress *actor.Address) {
 	state.subscribers = append(state.subscribers, subscriberAddress)
 }
 
-func (state *SubscriptionsActor) removeSubscription(subscriberAddress *actor.Address) {
+func (state *Subscriptions) removeSubscription(subscriberAddress *actor.Address) {
 	for i, v := range state.subscribers {
 		if v.IsEqual(subscriberAddress) {
 			state.subscribers = append(state.subscribers[:i], state.subscribers[i+1:]...)
@@ -64,11 +64,11 @@ func (state *SubscriptionsActor) removeSubscription(subscriberAddress *actor.Add
 	}
 }
 
-func (state *SubscriptionsActor) NumSubscribers() int {
+func (state *Subscriptions) NumSubscribers() int {
 	return len(state.subscribers)
 }
 
-func (state *SubscriptionsActor) NotifySubscribers(msg actor.Message) int {
+func (state *Subscriptions) NotifySubscribers(msg actor.Message) int {
 	result := 0
 	for _, sub := range state.subscribers {
 		msg.To = sub

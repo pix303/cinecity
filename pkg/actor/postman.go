@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"reflect"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,6 +21,7 @@ var (
 	ErrActorNotFound                   = errors.New("actor not found")
 	ErrActorAddressAlreadyRegistered   = errors.New("actor address already registered")
 	ErrInboxReturnMessageBodyTypeWrong = errors.New("return body message type is wrong")
+	ErrOutboundMessageBodyMustBeNotNil = errors.New("outbound message body must be not nil")
 )
 
 type Postman struct {
@@ -26,41 +29,68 @@ type Postman struct {
 	context                context.Context
 	cancelFunc             func()
 	enableOutboundMessages bool
-	outboundConnection     *nats.Conn
+	outboundOptions        *OutboundOptions
 }
+
 type PostmanOption func(*Postman)
 
-func WithOutboundMessage(natsConnection *nats.Conn) PostmanOption {
+func WithOutboundMessageService(
+	outboundArea string,
+	natsConnection *nats.Conn,
+	payloadTypeRegistry EnvelopePayloadTypeRegistry,
+) PostmanOption {
 	return func(p *Postman) {
-		p.outboundConnection = natsConnection
 		p.enableOutboundMessages = true
+
+		oo := OutboundOptions{
+			outboundArea:   outboundArea,
+			natsConnection: natsConnection,
+			typeRegistry:   payloadTypeRegistry,
+		}
+		p.outboundOptions = &oo
 	}
 }
 
-func OutboundMessageHandler(msg *nats.Msg) {
-	slog.Info("outbound message received", slog.String("msg", string(msg.Data)))
-	rawAddressSource := strings.Split(msg.Subject, "/")
-	if len(rawAddressSource) != 3 {
-		slog.Error("outbound message subject is invalid", slog.String("msg", string(msg.Subject)))
+func (p *Postman) OutboundMessageHandler(msg *nats.Msg) {
+	slog.Info("outbound message received", slog.String("msg", string(msg.Data)), slog.String("subj", string(msg.Subject)))
+	rawAddressSource := strings.Split(msg.Subject, AddressSeparator)
+	if len(rawAddressSource) < 3 {
+		slog.Error("outbound message subject is invalid", slog.Any("parts", rawAddressSource))
 		return
 	}
-	address := NewAddress(
-		rawAddressSource[1],
+
+	localActorAddress := NewAddress(
 		rawAddressSource[2],
+		rawAddressSource[3],
 	)
 
-	var body any
+	var envelop OutboundEvenlope
 
-	err := json.Unmarshal(msg.Data, body)
+	err := json.Unmarshal(msg.Data, &envelop)
 	if err != nil {
-		slog.Error("outbound message body is invalid", slog.String("err", err.Error()))
+		slog.Error("outbound message payload is invalid", slog.String("err", err.Error()))
 		return
 	}
 
+	payloadType := p.outboundOptions.typeRegistry[envelop.BodyType]
+	if payloadType == nil {
+		slog.Error("outbound payload type not found in registry", slog.String("type", envelop.BodyType))
+		return
+	}
+
+	payload := reflect.New(payloadType).Interface()
+	err = json.Unmarshal(envelop.RawBody, payload)
+	if err != nil {
+		slog.Error("outbound message payload is invalid", slog.String("err", err.Error()))
+		return
+	}
+
+	slog.Info("outbound message envelop", slog.Any("payload", payload))
+
 	finalMsg := NewMessage(
-		address,
+		localActorAddress,
 		nil,
-		body,
+		envelop,
 	)
 
 	err = SendMessage(finalMsg)
@@ -95,27 +125,31 @@ func InitPostman(opts ...PostmanOption) *Postman {
 			cancelFunc: cancFunc,
 		}
 
-		natsToken := os.Getenv("NATS_SECRET")
-		if natsToken == "" {
-			slog.Warn("NATS_SECRET is not set, so outbound feature is not active")
-			return
-		} else {
-			nc, err := nats.Connect(nats.DefaultURL, nats.Token(natsToken))
-			if err != nil {
-				slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
-			}
-
-			// TODO: check how to use subscription
-			_, err = nc.Subscribe(OutboundPrefix, OutboundMessageHandler)
-			if err != nil {
-				slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
-			}
-			slog.Info("NATS service is active")
-		}
-
 		for _, opt := range opts {
 			opt(instance)
 		}
+
+		if instance.enableOutboundMessages {
+			natsToken := os.Getenv("NATS_SECRET")
+			if natsToken == "" {
+				slog.Warn("NATS_SECRET is not set, so outbound feature is not active")
+				return
+			} else {
+				nc, err := nats.Connect(nats.DefaultURL, nats.Token(natsToken))
+				if err != nil {
+					slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
+				}
+
+				// TODO: check how to use subscription
+				subj := fmt.Sprintf("%s.*.*", GetOutboundAreaPrefix(instance.outboundOptions.outboundArea))
+				_, err = nc.Subscribe(subj, instance.OutboundMessageHandler)
+				if err != nil {
+					slog.Warn("NATS service fail on init", slog.String("err", err.Error()))
+				}
+				slog.Info("NATS service is active")
+			}
+		}
+
 	})
 
 	return instance
@@ -164,17 +198,26 @@ func UnRegisterActor(address *Address) {
 func SendMessage(msg Message) error {
 	p := GetPostman()
 
-	if msg.To.isOutbound {
-		var jsonResource []byte
-		err := json.Unmarshal(jsonResource, msg.Body)
+	if msg.To.IsOutbound() {
+		if msg.Body == nil {
+			return ErrOutboundMessageBodyMustBeNotNil
+		}
+
+		bodyType := reflect.TypeOf(msg.Body).String()
+		envelop, err := NewOutboundEnvelope(msg.Body, bodyType)
 		if err != nil {
-			slog.Error("outbound message body must be json", slog.String("msg", msg.String()))
 			return err
 		}
-		err = p.outboundConnection.Publish(OutboundPrefix, jsonResource)
+
+		envelopPayload, err := json.Marshal(envelop)
+		if err != nil {
+			return err
+		}
+
+		slog.Info("outbound message", slog.String("to", msg.To.String()))
+		err = p.outboundOptions.natsConnection.Publish(msg.To.String(), envelopPayload)
 		if err != nil {
 			slog.Error("outbound error on publish", slog.String("err", err.Error()))
-			return err
 		}
 		return err
 	}
@@ -235,11 +278,12 @@ func BroadcastMessage(msg Message, area *string) int {
 			continue
 		}
 
-		counter++
 		err := a.Inbox(msg)
 		if err != nil {
 			slog.Warn("actor inbox error on broadcasting message", slog.String("actor-address", msg.To.String()), slog.String("error", err.Error()))
+			continue
 		}
+		counter++
 	}
 
 	return counter
@@ -251,7 +295,11 @@ func ShutdownAll() {
 		a.Drop()
 	}
 	p.actors = make(map[string]*Actor)
-	p.outboundConnection.Close()
+
+	if p.enableOutboundMessages && p.outboundOptions != nil && p.outboundOptions.natsConnection != nil {
+		p.outboundOptions.natsConnection.Close()
+	}
+
 	p.cancelFunc()
 }
 

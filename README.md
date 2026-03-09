@@ -5,23 +5,42 @@ For other good examples of actor model implementation in Go check out [go-actor]
 
 ## Overview
 
-The Actor model promises to simplify and streamline the build process and interactions between application components, providing a model that reflects reality. This is achieved through the exchange of messages within actors. Each actor is responsible for updating its own state.
+The actor model promises to simplify and streamline the build process and interactions between application components, providing a model that reflects reality. This is achieved through the exchange of messages within actors. Each actor is responsible for updating its own state.
+
+### Actor
 
 An Actor is composed of:
-- An address defined by an area and an id
-- A state defined and modified by a StateProcessor interface
+- an address defined by an area and an id
+- a state defined and modified by a StateProcessor interface
 
-An **Actor** can:
-- Send messages to other actors
-- Change their own state in response to messages
-- Subscribe to future message of an other actor
-- Create new actors
+An Actor can:
+- change its own state in response to messages
+- send a message to another actor
+- send a message to another actor and wait a response
+- broadcast messages to subscribers
+- subscribe to messages from another actor
+- create new actors
 
-**Postman** is a manager entity in this model and it is responsible to inbox messages ("send and forget" approach) and to inbox and wait a response ("ask" approach).
+### Message
 
-## How to process message
+A Message is the entity used by actors to exchange data. It's composed of:
+- the destination address
+- the sender address
+- a body that represents the exchanged data
+- a flag to set if a response is needed
 
-The core method to implement StateProcessor interface is **Process** that takes a message as parameter, evaluate the body type and act consequentially 
+### StateProcessor
+
+The StateProcessor is an interface that represents the minimum API for handling the state managed by an actor. It takes care of processing incoming messages, cleanup before actor closure, and returning the current state.
+
+
+### Postman
+Postman is a manager responsible for register a new actor and his address, delivering messages ("send and forget" approach) and delivering and waiting for a response ("ask" approach).
+
+
+## How to process a message
+
+The core method to implement the StateProcessor interface is **Process** that takes a message as parameter, evaluates the body type, and acts accordingly. 
 
 ```go
 ...
@@ -29,28 +48,26 @@ func (state *ProductsState) Process(msg actor.Message) {
 	switch payload := msg.Body.(type) {
 
 	case AddNewProductPayload:
-		slog.Info("handling add product message")
 		p := payload.Product
 		state.products = append(state.products, p)
 
 	case AddQuantityToProductPayload:
-		slog.Info("handling add quantity to product message")
 		p := state.getProduct(payload.Code)
 		if p != nil {
 			p.Quantity += payload.Quantity
 			slog.Info("update quantity with success", slog.Int("qty", p.Quantity))
 		} else {
-			slog.Info("update quantity fail")
+			slog.Error("failed to update product quantity: missing code", slog.String("code",p.Code))
 		}
 	...
 ```
 
-## Init an actor
-Before to start using an actor it needs to create and register it
+## Initialize an actor
+Before using an actor, you need to create and register it
 
 ```go
 state := NewProductState() 
-warehouseAddress := actor.NewAddress("local", "warehouse")
+warehouseAddress := actor.NewAddress("main", "warehouse")
 warehouseActor, err := actor.RegisterActor(
   warehouseAddress,
 	state, 
@@ -58,7 +75,7 @@ warehouseActor, err := actor.RegisterActor(
 ```
 
 ## Send messages
-Messages are shipping in an async mode; here an example to create a message and just **send it and forget**
+Messages are sent asynchronously; here is an example to create a message and just **send it and forget**
 
 ```go
 msg := actor.NewMessage(
@@ -71,7 +88,7 @@ err := actor.SendMessage(msg)
 	
 ```
 
-Here an example to **send a message and wait a response**
+Here is an example to **send a message and wait for a response**
 
 ```go
 msg := actor.NewMessageWithResponse(
@@ -79,12 +96,12 @@ msg := actor.NewMessageWithResponse(
 		customerAddress, // from
 		AddQuantityToProductPayload{Code: "ABC", Quantity: 2}, // body
 	)
-
+// set the response type expected
 response, err := actor.SendMessageWithResponse[AddQuantityToProductResultPayload](msg)
 	
 ```
 
-A message can be sent to a group of actors organized by address area:
+A message can be broadcasted to a group of actors organized by address area:
 
 ```go
 msg := actor.NewMessage(
@@ -100,7 +117,7 @@ numActorsReached := actor.BroadcastMessage(msg, &filterByArea)
 ```
 
 ## Subscribe to receive messages
-An actor can subscribe to messages sent by another actor. The notifying actor will determine how to implement in the Process function which messages must be notified
+An actor can subscribe to messages sent by another actor. The notifying actor will determine which messages must be notified in the Process function
 
 ```go
 type NotifierActorProcessor struct {
@@ -111,11 +128,11 @@ type NotifierActorProcessor struct {
 
 func (a *NotifierActorProcessor ) Process(msg actor.Message) {
 	switch payload := msg.Body.(type) {
-	// library message body to add a subscription
+	// library available message body type for adding a subscription
 	case actor.AddSubscriptionMessageBody:
 		a.notifier.AddSubscription(msg.From)
-	// library message body to remove a subscription
-	case actor.RemoveSubscriptionMessageBody :
+	// library available message body type for removing a subscription
+	case actor.RemoveSubscriptionMessageBody:
 		a.notifier.RemoveSubscription(msg.From)
 	// example of a message that trigger notify the subscribers	
 	case TriggerSubscriptionNotifierBodyMsg:
@@ -124,20 +141,20 @@ func (a *NotifierActorProcessor ) Process(msg actor.Message) {
 	
 ```
 
-## Debounce and process messages in batch
-Messages can be batched together to avoid unnecessary processing of single messages
+## Batch messages
+Messages can be batched together to avoid unnecessary processing of single messages.
 
 ```go
 type State struct {
 	state     StateType
-	batcher   *batch.Batcher
+	updateBatcher   *batch.Batcher
 }
 
 func NewState() *State{
 	...
 	// wait max 5 seconds or max 5 messages, than trigger the handler function
 	b := batch.NewBatcher(5000, 5, state.updateItem)
-	s.batcher = b
+	s.updateBatcher = b
 	...
 }
 
@@ -145,7 +162,7 @@ func (state *State) Process(msg actor.Message) {
 	switch msg.Body.(type) {
 	// enqueue messages
 	case ItemUpdateMsgPayload:
-		state.batcher.Add(msg)
+		state.updateBatcher.Add(msg)
 	}
 }
 
@@ -153,4 +170,31 @@ func (state *State) Process(msg actor.Message) {
 func (s State) updateItem(msg actor.Message){
 	// update state
 }
+```
+
+## Send messages between apps 
+Different apps can be connected together exchanging messages via [NATS](https://github.com/nats-io/nats.go) in the same way they use locally within the app. You need to configure a NATS server connection, create a registry of exchanged message body types, and give a name to the app for matching with the outboundArea property of a message when initialize Postman.
+
+That's the code in app A
+```go
+natsToken := os.Getenv("NATS_SECRET")
+nc, _:= nats.Connect(nats.DefaultURL, nats.Token(natsToken))
+typesRegistry := actor.EnvelopePayloadTypeRegistry{
+	"message.WelcomeBody": reflect.TypeOf(message.WelcomeBody{}),
+}
+actor.InitPostman(actor.WithOutboundMessageService("app-A", nc, reg))
+```
+
+
+That's the code in app B
+```go
+fromAddress := actor.NewAddress("local", "actor-two")
+toAddress := actor.NewOutboundAddress("app-a", "local", "actor-one")
+remoteMsg := actor.NewMessage(
+	toAddress,
+	fromAddress,
+	message.WelcomeBody{Text: "hello app A, I'm app B"},
+)
+
+err = actor.SendMessage(remoteMsg)
 ```

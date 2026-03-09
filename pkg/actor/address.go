@@ -2,12 +2,13 @@ package actor
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Address struct {
-	area       string
-	id         string
-	isOutbound bool
+	area         string
+	id           string
+	outboundArea string
 }
 
 // NewAddress creates a new address with the given area and id for sending message within the application (see outbound address to send message to remote application).
@@ -15,18 +16,19 @@ func NewAddress(area, id string) *Address {
 	return &Address{
 		area,
 		id,
-		false,
+		"",
 	}
 }
 
-const OutboundPrefix string = "cinecity.outbound"
+const OutboundPrefix string = "cinecity"
+const AddressSeparator string = "."
 
 // NewOutboundAddress creates a new address with the given area and id for sending message to remote application.
-func NewOutboundAddress(area, id string) *Address {
+func NewOutboundAddress(outboundArea, area, id string) *Address {
 	return &Address{
 		area,
 		id,
-		true,
+		outboundArea,
 	}
 }
 
@@ -42,11 +44,16 @@ func (addr *Address) String() string {
 	if addr == nil {
 		return "address nil"
 	}
-
-	if addr.isOutbound {
-		return fmt.Sprintf("%s/%s/%s", OutboundPrefix, addr.area, addr.id)
+	addrParts := []string{
+		addr.area,
+		addr.id,
 	}
-	return fmt.Sprintf("%s/%s", addr.area, addr.id)
+
+	if addr.outboundArea != "" {
+		prefix := []string{GetOutboundAreaPrefix(addr.outboundArea)}
+		addrParts = append(prefix, addrParts...)
+	}
+	return strings.Join(addrParts, AddressSeparator)
 }
 
 func (addr *Address) Area() string {
@@ -58,9 +65,13 @@ func (addr *Address) ID() string {
 }
 
 func (addr *Address) IsOutbound() bool {
-	return addr.isOutbound
+	return addr.outboundArea != ""
 }
 
 func (addr *Address) IsInbound() bool {
-	return !addr.isOutbound
+	return !addr.IsOutbound()
+}
+
+func GetOutboundAreaPrefix(outboundArea string) string {
+	return fmt.Sprintf("%s.%s", OutboundPrefix, outboundArea)
 }

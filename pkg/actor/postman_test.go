@@ -13,7 +13,7 @@ import (
 type mockProcessor struct {
 	state    string
 	messages []actor.Message
-	notifier *subscriber.SubscriptionsActor
+	notifier *subscriber.Subscriptions
 }
 
 type TriggerSubscriptionNotifierBodyMsg string
@@ -53,7 +53,7 @@ func newMockProcessor() *mockProcessor {
 	processor := &mockProcessor{
 		state:    "initial",
 		messages: make([]actor.Message, 0),
-		notifier: subscriber.NewSubscriptionsActor(),
+		notifier: subscriber.NewSubscription(),
 	}
 	return processor
 }
@@ -192,7 +192,7 @@ func TestBroadcastMessageToAll(t *testing.T) {
 	actor.RegisterActor(toAddr1, processor1)
 	actor.RegisterActor(toAddr2, processor2)
 
-	msg := actor.NewMessage(toAddr1, fromAddr, "broadcast message")
+	msg := actor.NewBroadcastMessage(fromAddr, "broadcast message")
 	numSent := actor.BroadcastMessage(msg, nil)
 
 	time.Sleep(100 * time.Millisecond)
@@ -214,7 +214,7 @@ func TestBroadcastMessageByArea(t *testing.T) {
 	actor.RegisterActor(toLocalAddr, processorLocal)
 	actor.RegisterActor(toRemoteAddr, processorRemote)
 
-	msg := actor.NewMessage(toLocalAddr, fromAddr, "broadcast message")
+	msg := actor.NewBroadcastMessage(fromAddr, "broadcast message")
 	area := "local"
 	numSent := actor.BroadcastMessage(msg, &area)
 
@@ -244,7 +244,7 @@ func TestSubscrption(t *testing.T) {
 
 	assert.Equal(t, 2, len(processor.messages), "Expected 2 subscription message")
 	assert.Equal(t, 1, len(processorSub.messages), "Expected 1 subscription message")
-	assert.Contains(t, processorSub.GetState(), "hello", "Expected state modified by from reciver message")
+	assert.Contains(t, processorSub.GetState(), "hello", "Expected state modified by from reciever message")
 }
 
 func TestNumActors(t *testing.T) {

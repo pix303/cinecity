@@ -152,11 +152,11 @@ func Test_ActorString(t *testing.T) {
 	assert.NoError(t, err)
 	defer actor.UnRegisterActor(address)
 
-	expected := "address: local/test-actor - isClosed: false"
+	expected := "address: local.test-actor - isClosed: false"
 	assert.Equal(t, expected, act.String(), "Actor string representation should match expected format")
 
 	act.Deactivate()
-	expectedClosed := "address: local/test-actor - isClosed: true"
+	expectedClosed := "address: local.test-actor - isClosed: true"
 	assert.Equal(t, expectedClosed, act.String(), "Actor string representation should reflect closed state")
 }
 
