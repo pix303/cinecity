@@ -14,17 +14,17 @@ var (
 )
 
 type Actor struct {
-	address    *Address
-	MessageBox chan Message
-	isClosed   bool
-	state      StateProcessor
+	address        *Address
+	MessageBox     chan Message
+	isClosed       bool
+	stateProcessor StateProcessor
 }
 
 func (a *Actor) Activate() {
 	if a.IsClosed() {
 		slog.Info("Actor activated", slog.String("address", a.address.String()))
 		a.isClosed = false
-		p := a.state
+		p := a.stateProcessor
 		if p != nil {
 			go a.processMessage(a.MessageBox)
 		}
@@ -33,7 +33,7 @@ func (a *Actor) Activate() {
 
 func (a *Actor) processMessage(inboxChan <-chan Message) {
 	for msg := range inboxChan {
-		a.state.Process(msg)
+		a.stateProcessor.Process(msg)
 	}
 }
 
@@ -80,19 +80,19 @@ func (a *Actor) InboxAndWaitResponse(msg Message) (Message, error) {
 }
 
 func (a *Actor) Drop() {
-	mp := a.state
+	mp := a.stateProcessor
 	if mp != nil {
 		mp.Shutdown()
 	}
 	a.Deactivate()
 	UnRegisterActor(a.address)
 	a.address = nil
-	a.state = nil
+	a.stateProcessor = nil
 	close(a.MessageBox)
 }
 
 func (a *Actor) GetState() any {
-	mp := a.state
+	mp := a.stateProcessor
 	if mp != nil {
 		return mp.GetState()
 	}

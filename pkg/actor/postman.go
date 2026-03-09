@@ -172,10 +172,10 @@ func RegisterActor(address *Address, processor StateProcessor) (*Actor, error) {
 	}
 
 	a := Actor{
-		address:    address,
-		state:      processor,
-		MessageBox: make(chan Message, 100),
-		isClosed:   true,
+		address:        address,
+		stateProcessor: processor,
+		MessageBox:     make(chan Message, 100),
+		isClosed:       true,
 	}
 
 	p := GetPostman()
