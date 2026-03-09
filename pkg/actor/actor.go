@@ -32,8 +32,7 @@ func (a *Actor) Activate() {
 }
 
 func (a *Actor) processMessage(inboxChan <-chan Message) {
-	for {
-		msg := <-inboxChan
+	for msg := range inboxChan {
 		a.state.Process(msg)
 	}
 }
@@ -89,7 +88,7 @@ func (a *Actor) Drop() {
 	UnRegisterActor(a.address)
 	a.address = nil
 	a.state = nil
-	a.MessageBox = nil
+	close(a.MessageBox)
 }
 
 func (a *Actor) GetState() any {
